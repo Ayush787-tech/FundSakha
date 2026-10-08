@@ -1,0 +1,273 @@
+openapi: 3.0.3
+info:
+  title: Payment Gateway Simulation API
+  description: High-performance, modular payment gateway backend simulating payment processors with strategy pattern, transactional ledger, JWT and API-key auth.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local Development Server
+
+paths:
+  /auth/register:
+    post:
+      summary: Register a new merchant
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                  example: Acme E-Commerce
+                email:
+                  type: string
+                  example: merchant@acme.com
+                password:
+                  type: string
+                  example: SecurePass123!
+      responses:
+        '201':
+          description: Merchant created successfully
+        '409':
+          description: Email already registered
+
+  /auth/login:
+    post:
+      summary: Login merchant to receive JWT
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  example: merchant@acme.com
+                password:
+                  type: string
+                  example: SecurePass123!
+      responses:
+        '200':
+          description: Login successful with JWT token
+        '401':
+          description: Invalid credentials
+
+  /merchants/api-keys:
+    post:
+      summary: Generate a new Merchant API Key
+      tags: [Merchant Management]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Production Key
+      responses:
+        '201':
+          description: API key generated (secret returned once)
+
+  /merchants/me:
+    get:
+      summary: Get merchant profile and current balance
+      tags: [Merchant Management]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Merchant details and active API key list
+
+  /merchants/ledger:
+    get:
+      summary: Get merchant balance ledger entry logs
+      tags: [Merchant Management]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Ledger entry history
+
+  /orders:
+    post:
+      summary: Create a payment order
+      tags: [Orders]
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [merchant_order_id, amount]
+              properties:
+                merchant_order_id:
+                  type: string
+                  example: ORD-98765
+                amount:
+                  type: number
+                  example: 1499.00
+                currency:
+                  type: string
+                  example: INR
+                description:
+                  type: string
+                  example: Purchase of wireless headphones
+                customer_email:
+                  type: string
+                  example: buyer@example.com
+      responses:
+        '201':
+          description: Order created with status PENDING
+
+    get:
+      summary: List all merchant orders
+      tags: [Orders]
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of merchant orders
+
+  /orders/{id}:
+    get:
+      summary: Get order by ID
+      tags: [Orders]
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order details with associated payment records
+
+  /payments:
+    post:
+      summary: Initiate and process payment for an order
+      tags: [Payments]
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id, payment_method]
+              properties:
+                order_id:
+                  type: string
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                payment_method:
+                  type: string
+                  enum: [CREDIT_CARD, UPI, NETBANKING, MOCK_WALLET]
+                  example: CREDIT_CARD
+                details:
+                  type: object
+                  properties:
+                    cardNumber:
+                      type: string
+                      example: "4111111111111111"
+                    upiId:
+                      type: string
+                      example: user@upi
+                    bankCode:
+                      type: string
+                      example: HDFC
+      responses:
+        '200':
+          description: Payment successful
+        '402':
+          description: Payment declined or failed
+
+  /payments/{id}:
+    get:
+      summary: Get payment details by ID
+      tags: [Payments]
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment transaction details
+
+  /refunds:
+    post:
+      summary: Initiate refund for a successful payment
+      tags: [Refunds]
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payment_id, amount]
+              properties:
+                payment_id:
+                  type: string
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                amount:
+                  type: number
+                  example: 500.00
+                reason:
+                  type: string
+                  example: Partial return of item
+      responses:
+        '201':
+          description: Refund processed and merchant balance debited
+
+  /refunds/{id}:
+    get:
+      summary: Get refund details by ID
+      tags: [Refunds]
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Refund transaction details
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
